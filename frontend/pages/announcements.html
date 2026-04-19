@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EduTrack — Announcements</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../css/style.css"/>
+<style>
+.ann-card{background:var(--surface2);border:1px solid var(--border2);border-radius:11px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s;}
+.ann-card:hover{border-color:var(--border2);}
+.ann-card.high{border-left:3px solid var(--red);}
+.ann-card.medium{border-left:3px solid var(--amber);}
+.ann-card.low{border-left:3px solid var(--green);}
+.ann-head{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.ann-title{font-size:14px;font-weight:700;}
+.ann-body{font-size:12.5px;color:var(--text2);line-height:1.7;}
+.ann-foot{display:flex;align-items:center;gap:10px;}
+.ann-date{font-size:10.5px;color:var(--text3);font-family:var(--mono);}
+</style>
+</head>
+<body>
+<div class="sidebar" id="sidebar-root"></div>
+<div class="main">
+  <div class="topbar">
+    <div><h1>Announcements</h1><div class="tsub">Post notices for students</div></div>
+    <button class="btn btn-primary" onclick="openModal('ann-modal')">＋ New Announcement</button>
+  </div>
+  <div class="page-body">
+    <div id="ann-list" style="display:flex;flex-direction:column;gap:12px;"></div>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="ann-modal">
+  <div class="modal">
+    <div class="modal-close-row">
+      <h2>New Announcement</h2>
+      <button class="modal-close" onclick="closeModal('ann-modal')">✕</button>
+    </div>
+    <div class="form-grid single">
+      <div class="form-group"><label>Title *</label><input id="a-title" placeholder="e.g. Exam Schedule Released"/></div>
+      <div class="form-group">
+        <label>Priority</label>
+        <select id="a-priority">
+          <option value="low">Low — General Info</option>
+          <option value="medium" selected>Medium — Important</option>
+          <option value="high">High — Urgent</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Content *</label><textarea id="a-content" rows="5" placeholder="Enter announcement details…"></textarea></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('ann-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAnn()">Post Announcement</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/shared.js"></script>
+<script>
+(function(){
+  const session = authGuard('admin');
+  if(!session) return;
+  renderSidebar('announcements');
+
+  window.saveAnn = async function() {
+    const title=document.getElementById('a-title').value.trim();
+    const content=document.getElementById('a-content').value.trim();
+    const priority=document.getElementById('a-priority').value;
+    if(!title||!content){toast('Fill title and content','error');return;}
+    const r=await POST(API.announcements,{title,content,priority});
+    if(r.success){toast('Announcement posted','success');closeModal('ann-modal');document.getElementById('a-title').value='';document.getElementById('a-content').value='';loadAnns();}
+    else toast(r.message||'Error','error');
+  };
+
+  window.deleteAnn = function(id,title) {
+    confirmDlg(`Delete announcement <strong>"${title}"</strong>?`, async()=>{
+      const r=await DELETE(API.announcements+'/'+id);
+      if(r.success){toast('Deleted','success');loadAnns();}
+      else toast(r.message,'error');
+    });
+  };
+
+  async function loadAnns() {
+    const r=await GET(API.announcements);
+    const list=document.getElementById('ann-list');
+    if(!r.success){list.innerHTML='<div style="color:var(--red);">Failed to load</div>';return;}
+    if(!r.data.length){
+      list.innerHTML=`<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px;">No announcements yet. Click <strong>+ New Announcement</strong> to post one.</div>`;
+      return;
+    }
+    list.innerHTML=r.data.map(a=>`
+      <div class="ann-card ${a.priority||'general'}">
+        <div class="ann-head">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="badge badge-${a.priority||'general'}">${(a.priority||'general').toUpperCase()}</span>
+            <span class="ann-title">${a.title}</span>
+          </div>
+          <button class="btn btn-danger btn-xs" onclick="deleteAnn('${a._id}','${a.title.replace(/'/g,"\\'")}')">Delete</button>
+        </div>
+        <div class="ann-body">${a.content}</div>
+        <div class="ann-foot">
+          <span class="ann-date">Posted: ${new Date(a.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</span>
+          <span class="tag">By ${a.createdBy}</span>
+        </div>
+      </div>`).join('');
+  }
+  loadAnns();
+})();
+</script>
+</body>
+</html>

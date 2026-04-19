@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EduTrack — Marks</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<div class="sidebar" id="sidebar-root"></div>
+<div class="main">
+  <div class="topbar">
+    <div><h1>Marks</h1><div class="tsub">Add & update exam marks per student</div></div>
+  </div>
+  <div class="page-body">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="si">⌕</span>
+        <input type="text" id="search-input" placeholder="Search students…" oninput="onSearch()"/>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="ph-title">Student Marks</span>
+        <span class="ph-count" id="cnt">0 students</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Name</th><th>Roll No.</th><th>Course</th><th>Overall Marks</th><th>Grade</th><th>Actions</th></tr></thead>
+          <tbody id="marks-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MARKS MODAL -->
+<div class="modal-overlay" id="marks-modal">
+  <div class="modal">
+    <div class="modal-close-row">
+      <h2 id="marks-modal-title">Add Marks</h2>
+      <button class="modal-close" onclick="closeModal('marks-modal')">✕</button>
+    </div>
+    <div id="existing-marks" style="margin-bottom:14px;"></div>
+    <div class="form-grid">
+      <div class="form-group"><label>Subject *</label><input id="m-subject" placeholder="e.g. Mathematics"/></div>
+      <div class="form-group"><label>Exam Type</label>
+        <select id="m-exam">
+          <option>Mid Term</option><option>End Term</option><option>Unit Test</option><option>Assignment</option><option>Practical</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Score *</label><input id="m-score" type="number" min="0" max="100" placeholder="85"/></div>
+      <div class="form-group"><label>Max Score</label><input id="m-max" type="number" min="1" placeholder="100"/></div>
+      <div class="form-group"><label>Date</label><input id="m-date" type="date"/></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin:10px 0 2px;font-family:var(--mono);">Overall marks = average of all subject scores.</div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('marks-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveMarks()">Save Marks</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/shared.js"></script>
+<script>
+(function(){
+  const session = authGuard('admin');
+  if(!session) return;
+  renderSidebar('marks');
+
+  let allStudents=[], currentStudentId=null;
+
+  window.openMarks = function(id) {
+    currentStudentId=id;
+    const s=allStudents.find(x=>x._id===id);
+    if(!s) return;
+    document.getElementById('marks-modal-title').textContent=`Marks — ${s.name}`;
+    ['subject','score','max','date'].forEach(k=>document.getElementById('m-'+k).value='');
+    document.getElementById('m-max').value='100';
+    document.getElementById('m-exam').value='Mid Term';
+    document.getElementById('m-date').value=new Date().toISOString().split('T')[0];
+
+    const records=s.marksRecords||[];
+    if(records.length){
+      document.getElementById('existing-marks').innerHTML=`
+        <div style="font-size:10.5px;color:var(--text3);font-family:var(--mono);margin-bottom:6px;text-transform:uppercase;letter-spacing:.8px;">Existing Records</div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          ${records.map(r=>`
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12.5px;font-weight:600;">${r.subject}</span>
+              <span style="font-family:var(--mono);font-size:11px;color:var(--text2);">${r.examType} · ${r.score}/${r.maxScore}</span>
+            </div>`).join('')}
+        </div>`;
+    } else {
+      document.getElementById('existing-marks').innerHTML='';
+    }
+    openModal('marks-modal');
+  };
+
+  window.saveMarks = async function() {
+    const subject=document.getElementById('m-subject').value.trim();
+    const examType=document.getElementById('m-exam').value;
+    const score=Number(document.getElementById('m-score').value);
+    const maxScore=Number(document.getElementById('m-max').value)||100;
+    const date=document.getElementById('m-date').value;
+    if(!subject||isNaN(score)){toast('Fill subject and score','error');return;}
+    const r=await POST(API.students+'/'+currentStudentId+'/marks',{subject,examType,score,maxScore,date});
+    if(r.success){toast('Marks saved','success');closeModal('marks-modal');loadStudents();}
+    else toast(r.message||'Error','error');
+  };
+
+  function render(students){
+    allStudents=students;
+    document.getElementById('cnt').textContent=students.length+' students';
+    const tbody=document.getElementById('marks-body');
+    if(!students.length){tbody.innerHTML=emptyState('No students found');return;}
+    tbody.innerHTML=students.map((s,i)=>`
+      <tr>
+        <td class="td-mono">${i+1}</td>
+        <td class="td-name">${s.name}</td>
+        <td class="td-mono">${s.rollNumber}</td>
+        <td>${s.course}</td>
+        <td><span style="font-weight:700;font-size:14px;">${s.marks}%</span></td>
+        <td>${gradeBadge(s.grade||'C')}</td>
+        <td><button class="btn btn-primary btn-sm" onclick="openMarks('${s._id}')">+ Add Marks</button></td>
+      </tr>`).join('');
+  }
+
+  let timer;
+  window.onSearch=function(){
+    clearTimeout(timer);
+    timer=setTimeout(async()=>{
+      const q=document.getElementById('search-input').value.trim();
+      const r=await GET(q?API.students+'/search?q='+encodeURIComponent(q):API.students);
+      if(r.success) render(r.data);
+    },300);
+  };
+
+  async function loadStudents(){
+    const r=await GET(API.students);
+    if(r.success) render(r.data);
+  }
+  loadStudents();
+})();
+</script>
+</body>
+</html>

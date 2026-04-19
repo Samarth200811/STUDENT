@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EduTrack — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<div class="sidebar" id="sidebar-root"></div>
+<div class="main">
+  <div class="topbar">
+    <div>
+      <h1>Dashboard</h1>
+      <div class="tsub" id="greeting">Good morning, Admin</div>
+    </div>
+    <div class="row">
+      <span class="tag" id="date-tag">—</span>
+    </div>
+  </div>
+  <div class="page-body">
+    <div class="cards-grid cards-4 mb24" id="stat-cards">
+      <div class="stat-card blue"><div class="sc-icon">👥</div><div class="sc-label">Total Students</div><div class="sc-val" id="s-total">—</div><div class="sc-sub">Enrolled</div></div>
+      <div class="stat-card green"><div class="sc-icon">📊</div><div class="sc-label">Avg Marks</div><div class="sc-val" id="s-marks">—</div><div class="sc-sub">Class average</div></div>
+      <div class="stat-card cyan"><div class="sc-icon">📅</div><div class="sc-label">Avg Attendance</div><div class="sc-val" id="s-att">—</div><div class="sc-sub">Class average</div></div>
+      <div class="stat-card red"><div class="sc-icon">⚠️</div><div class="sc-label">Low Attendance</div><div class="sc-val" id="s-low">—</div><div class="sc-sub">Below 75%</div></div>
+    </div>
+
+    <div class="cards-grid cards-2 mb24">
+      <div class="panel">
+        <div class="panel-head"><span class="ph-title">Grade Distribution</span></div>
+        <div style="padding:20px;" id="grade-dist"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="ph-title">Recent Students</span>
+          <a href="students.html" class="btn btn-ghost btn-sm">View All →</a>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Roll</th><th>Marks</th><th>Attendance</th></tr></thead>
+            <tbody id="recent-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="ph-title">Recent Announcements</span>
+        <a href="announcements.html" class="btn btn-ghost btn-sm">Manage →</a>
+      </div>
+      <div id="ann-list" style="padding:14px;display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+  </div>
+</div>
+<script src="../js/shared.js"></script>
+<script>
+(function(){
+  const session = authGuard('admin');
+  if(!session) return;
+  renderSidebar('dashboard');
+
+  // FIX: corrected broken ternary that crashed the entire script
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('greeting').textContent = `${greet}, ${session.user.name}`;
+  document.getElementById('date-tag').textContent = new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+
+  async function loadStats() {
+    const r = await GET(API.students+'/stats');
+    if(!r.success) return;
+    const d = r.data;
+    document.getElementById('s-total').textContent = d.total;
+    document.getElementById('s-marks').textContent = d.avgMarks+'%';
+    document.getElementById('s-att').textContent = d.avgAttendance+'%';
+    document.getElementById('s-low').textContent = d.lowAttendance;
+
+    const grades = [
+      {label:'Grade A',count:d.gradeA,color:'var(--green)',pct: d.total?Math.round(d.gradeA/d.total*100):0},
+      {label:'Grade B',count:d.gradeB,color:'var(--blue)',pct: d.total?Math.round(d.gradeB/d.total*100):0},
+      {label:'Grade C',count:d.gradeC,color:'var(--amber)',pct: d.total?Math.round(d.gradeC/d.total*100):0},
+    ];
+    document.getElementById('grade-dist').innerHTML = grades.map(g=>`
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span style="font-size:12.5px;font-weight:600;">${g.label}</span>
+          <span style="font-size:11px;font-family:var(--mono);color:var(--text2);">${g.count} students · ${g.pct}%</span>
+        </div>
+        <div style="height:6px;background:var(--border2);border-radius:99px;overflow:hidden;">
+          <div style="height:100%;width:${g.pct}%;background:${g.color};border-radius:99px;transition:width .5s;"></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function loadRecent() {
+    const r = await GET(API.students);
+    if(!r.success) return;
+    const students = r.data.slice(0,6);
+    const tbody = document.getElementById('recent-table');
+    if(!students.length){ tbody.innerHTML=emptyState('No students yet'); return; }
+    tbody.innerHTML = students.map(s=>`
+      <tr>
+        <td class="td-name">${s.name}</td>
+        <td class="td-mono">${s.rollNumber}</td>
+        <td>${s.marks}%</td>
+        <td>${attCell(s.attendance)}</td>
+      </tr>
+    `).join('');
+  }
+
+  async function loadAnn() {
+    const r = await GET(API.announcements);
+    if(!r.success) return;
+    const list = document.getElementById('ann-list');
+    if(!r.data.length){ list.innerHTML=`<div style="color:var(--text3);font-size:12.5px;padding:8px;">No announcements yet.</div>`; return; }
+    list.innerHTML = r.data.slice(0,3).map(a=>`
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:13px 15px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+          <span style="font-size:13px;font-weight:700;">${a.title}</span>
+        </div>
+        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;">${a.content || ''}</div>
+        <div style="font-size:10.5px;color:var(--text3);font-family:var(--mono);margin-top:6px;">${a.created_at ? new Date(a.created_at).toLocaleDateString('en-IN') : '—'}</div>
+      </div>
+    `).join('');
+  }
+
+  loadStats(); loadRecent(); loadAnn();
+})();
+</script>
+</body>
+</html>

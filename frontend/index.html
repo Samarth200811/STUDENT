@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EduTrack — Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#07080d;--surface:#0d0f17;--surface2:#121520;
+  --border:#1a1f2e;--border2:#212840;
+  --blue:#5b8dee;--blue-glow:rgba(91,141,238,.25);
+  --green:#4ade80;--green-glow:rgba(74,222,128,.15);
+  --text:#eef0f7;--text2:#6b7594;--text3:#323b55;
+  --ff:'Outfit',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+html{font-size:14px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--ff);background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.bg-grid{position:fixed;inset:0;background-image:linear-gradient(rgba(91,141,238,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(91,141,238,.04) 1px,transparent 1px);background-size:48px 48px;pointer-events:none}
+.bg-glow{position:fixed;top:-200px;left:50%;transform:translateX(-50%);width:700px;height:700px;background:radial-gradient(circle,rgba(91,141,238,.08) 0%,transparent 70%);pointer-events:none}
+.card{background:var(--surface);border:1px solid var(--border2);border-radius:18px;padding:36px 32px;width:100%;max-width:420px;margin:16px;position:relative;z-index:1;box-shadow:0 24px 80px rgba(0,0,0,.5)}
+.logo-row{display:flex;align-items:center;gap:11px;margin-bottom:28px}
+.logo-icon{width:40px;height:40px;background:var(--blue);border-radius:10px;display:grid;place-items:center;font-size:18px;box-shadow:0 0 24px var(--blue-glow);flex-shrink:0}
+.logo-text{font-size:20px;font-weight:900;letter-spacing:-.5px}
+.logo-sub{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:1px}
+.card-title{font-size:22px;font-weight:800;letter-spacing:-.5px;margin-bottom:4px}
+.card-sub{font-size:12.5px;color:var(--text2);margin-bottom:26px;line-height:1.6}
+
+/* Mode tabs: Login / Register */
+.mode-tabs{display:flex;gap:4px;background:var(--surface2);border-radius:9px;padding:4px;margin-bottom:18px;border:1px solid var(--border)}
+.mode-tab{flex:1;padding:7px 0;text-align:center;border-radius:6px;font-size:12.5px;font-weight:600;color:var(--text2);cursor:pointer;transition:all .15s}
+.mode-tab.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px var(--blue-glow)}
+
+/* Role tabs: Admin / Student */
+.tabs{display:flex;gap:4px;background:var(--surface2);border-radius:9px;padding:4px;margin-bottom:22px;border:1px solid var(--border)}
+.tab{flex:1;padding:7px 0;text-align:center;border-radius:6px;font-size:12.5px;font-weight:600;color:var(--text2);cursor:pointer;transition:all .15s}
+.tab.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px var(--blue-glow)}
+
+.form-group{margin-bottom:14px}
+label{display:block;font-size:10.5px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.9px;font-family:var(--mono);margin-bottom:6px}
+input{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:9px;padding:10px 14px;color:var(--text);font-family:var(--ff);font-size:13.5px;outline:none;transition:border-color .15s}
+input:focus{border-color:var(--blue)}
+input::placeholder{color:var(--text3)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-main{width:100%;background:var(--blue);color:#fff;border:none;border-radius:9px;padding:12px;font-family:var(--ff);font-size:14px;font-weight:700;cursor:pointer;transition:all .15s;margin-top:4px;letter-spacing:-.2px}
+.btn-main:hover{background:#4a7de0;box-shadow:0 0 24px var(--blue-glow)}
+.btn-main:disabled{opacity:.6;cursor:not-allowed}
+.err{background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:10px 14px;font-size:12.5px;color:#f87171;margin-bottom:12px;display:none}
+.ok{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:10px 14px;font-size:12.5px;color:var(--green);margin-bottom:12px;display:none}
+.hint{font-size:11px;color:var(--text3);font-family:var(--mono);background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 13px;margin-top:14px;line-height:1.8}
+.admin-secret-row{margin-bottom:14px}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+<div class="card">
+  <div class="logo-row">
+    <div class="logo-icon">🎓</div>
+    <div>
+      <div class="logo-text">EduTrack</div>
+      <div class="logo-sub">student management system</div>
+    </div>
+  </div>
+
+  <!-- Mode: Login / Register -->
+  <div class="mode-tabs">
+    <div class="mode-tab active" onclick="setMode('login')">Sign In</div>
+    <div class="mode-tab" onclick="setMode('register')">Register</div>
+  </div>
+
+  <!-- Role: Admin / Student -->
+  <div class="tabs">
+    <div class="tab active" onclick="setRole('admin')">Admin</div>
+    <div class="tab" onclick="setRole('student')">Student</div>
+  </div>
+
+  <div class="err" id="err"></div>
+  <div class="ok" id="ok"></div>
+
+  <!-- ── LOGIN FORM ── -->
+  <div id="loginForm">
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="login-email" placeholder="Enter your email" autocomplete="email"/>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password"/>
+    </div>
+    <button class="btn-main" id="loginBtn" onclick="doLogin()">Sign In</button>
+  </div>
+
+  <!-- ── REGISTER FORM ── -->
+  <div id="registerForm" style="display:none">
+    <!-- Admin secret key (only shown for admin) -->
+    <div class="form-group admin-secret-row" id="adminSecretRow">
+      <label>Admin Secret Key</label>
+      <input type="password" id="reg-secret" placeholder="Enter admin secret key"/>
+    </div>
+
+    <div class="form-group">
+      <label>Full Name</label>
+      <input type="text" id="reg-name" placeholder="Enter full name"/>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="reg-email" placeholder="Enter email address"/>
+    </div>
+
+    <!-- Student-only fields -->
+    <div id="studentFields">
+      <div class="form-group">
+        <label>Roll Number</label>
+        <input type="text" id="reg-roll" placeholder="e.g. CS2024001"/>
+      </div>
+      <div class="row2">
+        <div class="form-group">
+          <label>Course</label>
+          <input type="text" id="reg-course" placeholder="e.g. B.Tech"/>
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" id="reg-phone" placeholder="10-digit number"/>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="reg-password" placeholder="Min 6 characters"/>
+    </div>
+    <button class="btn-main" id="registerBtn" onclick="doRegister()">Create Account</button>
+  </div>
+
+  <div class="hint" id="hint">Admin login requires your registered email and password.</div>
+</div>
+
+<script>
+let currentRole = 'admin';
+let currentMode = 'login';
+
+function setMode(m) {
+  currentMode = m;
+  document.querySelectorAll('.mode-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&m==='login')||(i===1&&m==='register')));
+  document.getElementById('loginForm').style.display = m === 'login' ? '' : 'none';
+  document.getElementById('registerForm').style.display = m === 'register' ? '' : 'none';
+  clearMessages();
+  updateHint();
+}
+
+function setRole(r) {
+  currentRole = r;
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&r==='admin')||(i===1&&r==='student')));
+  // Show/hide admin secret + student fields
+  document.getElementById('adminSecretRow').style.display = r === 'admin' ? '' : 'none';
+  document.getElementById('studentFields').style.display = r === 'student' ? '' : 'none';
+  clearMessages();
+  updateHint();
+}
+
+function updateHint() {
+  const hints = {
+    'login-admin': 'Sign in with your admin email and password.',
+    'login-student': 'Sign in with your registered email and password.',
+    'register-admin': 'Admin registration requires the secret key from your system administrator.',
+    'register-student': 'Register with your institutional email and roll number.',
+  };
+  document.getElementById('hint').textContent = hints[`${currentMode}-${currentRole}`] || '';
+}
+
+function clearMessages() {
+  document.getElementById('err').style.display = 'none';
+  document.getElementById('ok').style.display = 'none';
+}
+
+function showErr(msg) {
+  const el = document.getElementById('err');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('ok').style.display = 'none';
+}
+
+function showOk(msg) {
+  const el = document.getElementById('ok');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('err').style.display = 'none';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') currentMode === 'login' ? doLogin() : doRegister();
+});
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value.trim();
+  clearMessages();
+  if (!email || !password) { showErr('Please fill all fields'); return; }
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (data.success) {
+      localStorage.setItem('sms_session', JSON.stringify(data));
+      // Always redirect based on role from response
+      window.location.href = data.role === 'admin' ? 'pages/dashboard.html' : 'pages/student-portal.html';
+    } else {
+      showErr(data.message || 'Invalid credentials');
+    }
+  } catch(e) {
+    showErr('Server error. Is the backend running?');
+  } finally { btn.disabled = false; btn.textContent = 'Sign In'; }
+}
+
+async function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value.trim();
+  clearMessages();
+  if (!name || !email || !password) { showErr('Name, email and password are required'); return; }
+
+  const btn = document.getElementById('registerBtn');
+  btn.disabled = true; btn.textContent = 'Creating account…';
+
+  try {
+    let url, body, headers = { 'Content-Type': 'application/json' };
+
+    if (currentRole === 'admin') {
+      const secret = document.getElementById('reg-secret').value.trim();
+      if (!secret) { showErr('Admin secret key is required'); btn.disabled=false; btn.textContent='Create Account'; return; }
+      url = '/api/auth/register/admin';
+      body = { name, email, password };
+      headers['x-admin-secret'] = secret;
+    } else {
+      const rollNumber = document.getElementById('reg-roll').value.trim();
+      const course = document.getElementById('reg-course').value.trim();
+      const phone = document.getElementById('reg-phone').value.trim();
+      if (!rollNumber) { showErr('Roll number is required'); btn.disabled=false; btn.textContent='Create Account'; return; }
+      url = '/api/auth/register/student';
+      body = { name, email, password, rollNumber, course, phone };
+    }
+
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    const data = await res.json();
+
+    if (data.success) {
+      showOk(`Account created! You can now sign in.`);
+      // Switch to login after 1.5s
+      setTimeout(() => setMode('login'), 1500);
+    } else {
+      showErr(data.message || 'Registration failed');
+    }
+  } catch(e) {
+    showErr('Server error. Is the backend running?');
+  } finally { btn.disabled = false; btn.textContent = 'Create Account'; }
+}
+
+// Init
+localStorage.removeItem('sms_session');
+setRole('admin');
+updateHint();
+</script>
+</body>
+</html>

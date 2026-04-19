@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EduTrack — Notices</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../css/style.css"/>
+<style>
+.ann-card{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:18px 20px;transition:border-color .15s;cursor:default;}
+.ann-card:hover{border-color:var(--border2);box-shadow:0 4px 20px rgba(0,0,0,.2);}
+.ann-card.high{border-left:3px solid var(--red);}
+.ann-card.medium{border-left:3px solid var(--amber);}
+.ann-card.low{border-left:3px solid var(--green);}
+.ann-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;}
+.ann-title{font-size:14.5px;font-weight:700;line-height:1.4;}
+.ann-body{font-size:13px;color:var(--text2);line-height:1.75;}
+.ann-foot{display:flex;align-items:center;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);}
+.ann-date{font-size:10.5px;color:var(--text3);font-family:var(--mono);}
+.priority-icon.high{color:var(--red);}
+.priority-icon.medium{color:var(--amber);}
+.priority-icon.low{color:var(--green);}
+.filter-row{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+.f-pill{padding:6px 14px;border-radius:99px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);font-family:var(--ff);transition:all .15s;background:transparent;color:var(--text2);}
+.f-pill.active,.f-pill:hover{background:var(--blue-dim);color:var(--blue);border-color:rgba(91,141,238,.25);}
+.f-pill.active-high{background:var(--red-dim);color:var(--red);border-color:rgba(248,113,113,.2);}
+.f-pill.active-medium{background:var(--amber-dim);color:var(--amber);border-color:rgba(251,191,36,.2);}
+.f-pill.active-low{background:var(--green-dim);color:var(--green);border-color:rgba(52,211,153,.2);}
+</style>
+</head>
+<body>
+<div class="sidebar" id="sidebar-root"></div>
+<div class="main">
+  <div class="topbar">
+    <div><h1>Notices</h1><div class="tsub">Announcements from administration</div></div>
+    <span class="ph-count" id="total-count">0 notices</span>
+  </div>
+  <div class="page-body">
+    <div class="filter-row">
+      <button class="f-pill active" id="pill-all" onclick="setFilter('all')">All</button>
+      <button class="f-pill" id="pill-high" onclick="setFilter('high')">🔴 Urgent</button>
+      <button class="f-pill" id="pill-medium" onclick="setFilter('medium')">🟡 Important</button>
+      <button class="f-pill" id="pill-low" onclick="setFilter('low')">🟢 General</button>
+    </div>
+    <div id="ann-list" style="display:flex;flex-direction:column;gap:12px;"></div>
+  </div>
+</div>
+<script src="../js/shared.js"></script>
+<script>
+(function(){
+  const session = authGuard('student');
+  if(!session) return;
+  renderSidebar('my-announcements');
+
+  let allAnns=[], activeFilter='all';
+
+  window.setFilter=function(f){
+    activeFilter=f;
+    // Update pill styles
+    document.querySelectorAll('.f-pill').forEach(p=>p.className='f-pill');
+    const el=document.getElementById('pill-'+f);
+    if(el) el.className='f-pill active'+(f!=='all'?'-'+f:'');
+    render();
+  };
+
+  function render(){
+    const filtered=activeFilter==='all'?allAnns:allAnns.filter(a=>a.priority===activeFilter);
+    document.getElementById('total-count').textContent=filtered.length+' notice'+(filtered.length!==1?'s':'');
+    const list=document.getElementById('ann-list');
+    if(!filtered.length){
+      list.innerHTML=`<div style="text-align:center;padding:50px 20px;">
+        <div style="font-size:32px;margin-bottom:12px;">📭</div>
+        <div style="color:var(--text3);font-size:13px;">${activeFilter==='all'?'No announcements yet.':'No '+activeFilter+' announcements.'}</div>
+      </div>`;
+      return;
+    }
+    const priorityLabel={high:'🔴 Urgent',medium:'🟡 Important',low:'🟢 General'};
+    list.innerHTML=filtered.map(a=>`
+      <div class="ann-card ${a.priority||'general'}">
+        <div class="ann-head">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span class="badge badge-${a.priority||'general'}">${priorityLabel[a.priority]||a.priority}</span>
+            </div>
+            <div class="ann-title">${a.title}</div>
+          </div>
+        </div>
+        <div class="ann-body">${a.content}</div>
+        <div class="ann-foot">
+          <span class="ann-date">📅 ${new Date(a.created_at).toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'long',year:'numeric'})}</span>
+          <span class="tag">By ${a.createdBy}</span>
+        </div>
+      </div>`).join('');
+  }
+
+  async function load(){
+    const r=await GET(API.announcements);
+    if(!r.success){document.getElementById('ann-list').innerHTML='<div style="color:var(--red);">Failed to load announcements.</div>';return;}
+    allAnns=r.data;
+    render();
+  }
+  load();
+})();
+</script>
+</body>
+</html>

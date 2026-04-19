@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EduTrack — Students</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../css/style.css"/>
+</head>
+<body>
+<div class="sidebar" id="sidebar-root"></div>
+<div class="main">
+  <div class="topbar">
+    <div><h1>Students</h1><div class="tsub">Manage enrolled students</div></div>
+    <button class="btn btn-primary" onclick="openAdd()">＋ Add Student</button>
+  </div>
+  <div class="page-body">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="si">⌕</span>
+        <input type="text" id="search-input" placeholder="Search by name…" oninput="onSearch()"/>
+      </div>
+      <div class="filter-btns">
+        <button class="fbtn on" id="f-all" onclick="setFilter('all')">All</button>
+        <button class="fbtn" id="f-high" onclick="setFilter('high_marks')">High Marks</button>
+        <button class="fbtn" id="f-low" onclick="setFilter('low_attendance')">Low Attendance</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="ph-title">Student List</span>
+        <span class="ph-count" id="count-badge">0 students</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Name</th><th>Roll No.</th><th>Email</th><th>Course</th>
+              <th>Marks</th><th>Attendance</th><th>Grade</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="students-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD / EDIT MODAL -->
+<div class="modal-overlay" id="student-modal">
+  <div class="modal">
+    <div class="modal-close-row">
+      <h2 id="modal-title">Add Student</h2>
+      <button class="modal-close" onclick="closeModal('student-modal')">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label>Full Name *</label><input id="f-name" placeholder="John Doe"/></div>
+      <div class="form-group"><label>Roll Number *</label><input id="f-roll" placeholder="ROLL001"/></div>
+      <div class="form-group"><label>Email *</label><input id="f-email" type="email" placeholder="john@example.com"/></div>
+      <div class="form-group"><label>Password *</label><input id="f-pass" type="password" placeholder="student123"/></div>
+      <div class="form-group"><label>Course *</label><input id="f-course" placeholder="B.Tech CS"/></div>
+      <div class="form-group"><label>Phone</label><input id="f-phone" placeholder="+91 9876543210"/></div>
+      <div class="form-group full"><label>Address</label><textarea id="f-address" placeholder="City, State"></textarea></div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin:12px 0 4px;font-family:var(--mono);">NOTE: Marks & attendance are updated via their dedicated pages.</div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="closeModal('student-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveStudent()">Save Student</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW MODAL -->
+<div class="modal-overlay" id="view-modal">
+  <div class="modal modal-lg">
+    <div class="modal-close-row">
+      <h2 id="view-title">Student Profile</h2>
+      <button class="modal-close" onclick="closeModal('view-modal')">✕</button>
+    </div>
+    <div id="view-body"></div>
+  </div>
+</div>
+
+<script src="../js/shared.js"></script>
+<script>
+(function(){
+  const session = authGuard('admin');
+  if(!session) return;
+  renderSidebar('students');
+
+  let allStudents = [];
+  let editId = null;
+  let activeFilter = 'all';
+
+  window.openAdd = function() {
+    editId = null;
+    document.getElementById('modal-title').textContent = 'Add Student';
+    ['name','roll','email','pass','course','phone','address'].forEach(k => {
+      const el = document.getElementById('f-'+k);
+      if(el) el.value = '';
+    });
+    openModal('student-modal');
+  };
+
+  window.openEdit = function(id) {
+    const s = allStudents.find(x=>x._id===id);
+    if(!s) return;
+    editId = id;
+    document.getElementById('modal-title').textContent = 'Edit Student';
+    document.getElementById('f-name').value = s.name||'';
+    document.getElementById('f-roll').value = s.rollNumber||'';
+    document.getElementById('f-email').value = s.email||'';
+    document.getElementById('f-pass').value = '';
+    document.getElementById('f-course').value = s.course||'';
+    document.getElementById('f-phone').value = s.phone||'';
+    document.getElementById('f-address').value = s.address||'';
+    openModal('student-modal');
+  };
+
+  window.viewStudent = function(id) {
+    const s = allStudents.find(x=>x._id===id);
+    if(!s) return;
+    document.getElementById('view-title').textContent = s.name;
+    document.getElementById('view-body').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+        ${[['Roll Number',s.rollNumber],['Email',s.email],['Course',s.course],['Phone',s.phone||'—'],['Address',s.address||'—','full'],['Password',s.password||'—']].map(([l,v,cls])=>`
+          <div style="${cls?'grid-column:1/-1':''};background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;">
+            <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:4px;text-transform:uppercase;">${l}</div>
+            <div style="font-size:13px;font-weight:600;">${v}</div>
+          </div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px;">
+        <div style="background:var(--green-dim);border:1px solid rgba(52,211,153,.2);border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:var(--green);">${s.marks}%</div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:2px;">Marks</div>
+        </div>
+        <div style="background:var(--cyan-dim);border:1px solid rgba(34,211,238,.2);border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:var(--cyan);">${s.attendance}%</div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:2px;">Attendance</div>
+        </div>
+        <div style="background:var(--blue-dim);border:1px solid rgba(91,141,238,.2);border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:var(--blue);">${s.grade||'N/A'}</div>
+          <div style="font-size:10.5px;color:var(--text2);margin-top:2px;">Grade</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);font-family:var(--mono);">Registered: ${new Date(s.createdAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</div>
+    `;
+    openModal('view-modal');
+  };
+
+  window.saveStudent = async function() {
+    const name=document.getElementById('f-name').value.trim();
+    const rollNumber=document.getElementById('f-roll').value.trim();
+    const email=document.getElementById('f-email').value.trim();
+    const password=document.getElementById('f-pass').value.trim();
+    const course=document.getElementById('f-course').value.trim();
+    const phone=document.getElementById('f-phone').value.trim();
+    const address=document.getElementById('f-address').value.trim();
+    if(!name||!rollNumber||!email||!course){toast('Fill all required fields','error');return;}
+    if(!editId&&!password){toast('Password is required','error');return;}
+    const body={name,rollNumber,email,course,phone,address};
+    if(password) body.password=password;
+    let r;
+    if(editId){ r=await PUT(API.students+'/'+editId, body); }
+    else { r=await POST(API.students, body); }
+    if(r.success){toast(editId?'Student updated':'Student added','success');closeModal('student-modal');loadStudents();}
+    else toast(r.message||'Error saving student','error');
+  };
+
+  window.deleteStudent = function(id,name) {
+    confirmDlg(`Delete <strong>${name}</strong>? This cannot be undone.`, async()=>{
+      const r=await DELETE(API.students+'/'+id);
+      if(r.success){toast('Student deleted','success');loadStudents();}
+      else toast(r.message,'error');
+    });
+  };
+
+  window.setFilter = function(f) {
+    activeFilter=f;
+    document.getElementById('f-all').classList.toggle('on',f==='all');
+    document.getElementById('f-high').classList.toggle('on',f==='high_marks');
+    document.getElementById('f-low').classList.toggle('on',f==='low_attendance');
+    loadStudents();
+  };
+
+  let searchTimer;
+  window.onSearch = function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(()=>loadStudents(), 300);
+  };
+
+  function render(students) {
+    allStudents = students;
+    const tbody = document.getElementById('students-body');
+    document.getElementById('count-badge').textContent = students.length+' student'+(students.length!==1?'s':'');
+    if(!students.length){tbody.innerHTML=emptyState('No students found');return;}
+    tbody.innerHTML = students.map((s,i)=>`
+      <tr class="${s.attendance<75?'row-warn':''}">
+        <td class="td-mono">${i+1}</td>
+        <td class="td-name" style="cursor:pointer;" onclick="viewStudent('${s._id}')">${s.name}</td>
+        <td class="td-mono">${s.rollNumber}</td>
+        <td class="td-email">${s.email}</td>
+        <td>${s.course}</td>
+        <td><span style="font-weight:600;">${s.marks}%</span></td>
+        <td>${attCell(s.attendance)}</td>
+        <td>${gradeBadge(s.grade||'C')}</td>
+        <td>
+          <div style="display:flex;gap:5px;">
+            <button class="btn btn-ghost btn-xs" onclick="viewStudent('${s._id}')">View</button>
+            <button class="btn btn-ghost btn-xs" onclick="openEdit('${s._id}')">Edit</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteStudent('${s._id}','${s.name.replace(/'/g,"\\'")}')">Del</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function loadStudents() {
+    const q = document.getElementById('search-input').value.trim();
+    let url;
+    if(q) url=API.students+'/search?q='+encodeURIComponent(q);
+    else if(activeFilter!=='all') url=API.students+'/filter?type='+activeFilter;
+    else url=API.students;
+    const r=await GET(url);
+    if(r.success) render(r.data);
+    else toast('Failed to load students','error');
+  }
+
+  loadStudents();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EduTrack — Attendance</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../css/style.css"/>
+<style>
+.att-toggle{display:flex;gap:6px;}
+.att-btn{padding:5px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);font-family:var(--ff);transition:all .15s;background:transparent;color:var(--text2);}
+.att-btn.present{background:var(--green-dim);color:var(--green);border-color:rgba(52,211,153,.3);}
+.att-btn.absent{background:var(--red-dim);color:var(--red);border-color:rgba(248,113,113,.3);}
+.att-btn:not(.present):not(.absent):hover{background:var(--surface2);color:var(--text);}
+.bulk-bar{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:13px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+</style>
+</head>
+<body>
+<div class="sidebar" id="sidebar-root"></div>
+<div class="main">
+  <div class="topbar">
+    <div><h1>Attendance</h1><div class="tsub">Mark & manage student attendance</div></div>
+    <button class="btn btn-primary" onclick="saveAll()" id="save-btn">Save Attendance</button>
+  </div>
+  <div class="page-body">
+    <div class="bulk-bar">
+      <div class="form-group" style="margin:0;flex-direction:row;align-items:center;gap:8px;">
+        <label style="white-space:nowrap;text-transform:uppercase;">Date</label>
+        <input type="date" id="att-date" style="width:auto;" onchange="loadStudents()"/>
+      </div>
+      <div class="form-group" style="margin:0;flex-direction:row;align-items:center;gap:8px;">
+        <label style="white-space:nowrap;text-transform:uppercase;">Subject</label>
+        <input type="text" id="att-subject" placeholder="e.g. Mathematics" style="width:180px;" onchange="loadStudents()"/>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn btn-success btn-sm" onclick="markAll('present')">✓ All Present</button>
+        <button class="btn btn-danger btn-sm" onclick="markAll('absent')">✕ All Absent</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <span class="ph-title">Student Attendance</span>
+        <span class="ph-count" id="att-summary">0 present / 0 absent</span>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Name</th><th>Roll No.</th><th>Course</th><th>Overall Att.</th><th>Today's Status</th></tr></thead>
+          <tbody id="att-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../js/shared.js"></script>
+<script>
+(function(){
+  const session = authGuard('admin');
+  if(!session) return;
+  renderSidebar('attendance');
+
+  let students = [];
+  let statusMap = {}; // studentId -> 'present'|'absent'|''
+
+  // Set today's date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('att-date').value = today;
+
+  window.markAll = function(status) {
+    students.forEach(s => { statusMap[s._id] = status; });
+    renderRows();
+  };
+
+  window.toggleStatus = function(id, status) {
+    statusMap[id] = statusMap[id] === status ? '' : status;
+    updateSummary();
+    // Update buttons visually
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    if(row) {
+      row.querySelector('.tb-present').className = `att-btn present-btn ${statusMap[id]==='present'?'present':''}`;
+      row.querySelector('.tb-absent').className = `att-btn absent-btn ${statusMap[id]==='absent'?'absent':''}`;
+    }
+  };
+
+  function updateSummary() {
+    const vals = Object.values(statusMap);
+    const p = vals.filter(v=>v==='present').length;
+    const a = vals.filter(v=>v==='absent').length;
+    document.getElementById('att-summary').textContent = `${p} present / ${a} absent`;
+  }
+
+  function renderRows() {
+    const date = document.getElementById('att-date').value;
+    const subject = document.getElementById('att-subject').value.trim();
+    const tbody = document.getElementById('att-body');
+    if(!students.length){tbody.innerHTML=emptyState('No students enrolled');return;}
+    tbody.innerHTML = students.map((s,i)=>{
+      const st = statusMap[s._id]||'';
+      // Check if already recorded for this date+subject
+      const existing = (s.attendanceRecords||[]).find(r=>r.date===date&&r.subject===(subject||''));
+      const existLabel = existing ? `<span class="tag" style="font-size:10px;">${existing.status}</span>` : '';
+      return `
+        <tr data-id="${s._id}" class="${s.attendance<75?'row-warn':''}">
+          <td class="td-mono">${i+1}</td>
+          <td class="td-name">${s.name}</td>
+          <td class="td-mono">${s.rollNumber}</td>
+          <td>${s.course}</td>
+          <td>${attCell(s.attendance)}</td>
+          <td>
+            <div class="att-toggle">
+              <button class="att-btn present-btn ${st==='present'?'present':''}" onclick="toggleStatus('${s._id}','present')">✓ Present</button>
+              <button class="att-btn absent-btn ${st==='absent'?'absent':''}" onclick="toggleStatus('${s._id}','absent')">✕ Absent</button>
+              ${existLabel}
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+    updateSummary();
+  }
+
+  window.saveAll = async function() {
+    const date = document.getElementById('att-date').value;
+    const subject = document.getElementById('att-subject').value.trim();
+    if(!date){toast('Please select a date','error');return;}
+    const records = students
+      .filter(s=>statusMap[s._id])
+      .map(s=>({studentId:s._id, status:statusMap[s._id]}));
+    if(!records.length){toast('No attendance marked','warn');return;}
+    document.getElementById('save-btn').disabled=true;
+    const r = await POST(API.students+'/bulk-attendance', {records, date, subject});
+    document.getElementById('save-btn').disabled=false;
+    if(r.success){toast(`Saved attendance for ${r.updated} students`,'success');loadStudents();}
+    else toast(r.message||'Error saving','error');
+  };
+
+  async function loadStudents() {
+    const r = await GET(API.students);
+    if(!r.success) return;
+    students = r.data;
+    // Pre-fill statusMap from existing records for selected date+subject
+    const date = document.getElementById('att-date').value;
+    const subject = document.getElementById('att-subject').value.trim();
+    statusMap = {};
+    students.forEach(s=>{
+      const existing = (s.attendanceRecords||[]).find(rec=>rec.date===date&&rec.subject===(subject||''));
+      if(existing) statusMap[s._id] = existing.status;
+    });
+    renderRows();
+  }
+
+  loadStudents();
+})();
+</script>
+</body>
+</html>

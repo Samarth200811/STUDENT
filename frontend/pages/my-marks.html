@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EduTrack — My Marks</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../css/style.css"/>
+<style>
+.marks-card{background:var(--surface2);border:1px solid var(--border2);border-radius:11px;padding:16px 18px;transition:border-color .15s;}
+.marks-card:hover{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue-dim);}
+.mc-subject{font-size:14px;font-weight:700;margin-bottom:4px;}
+.mc-exam{font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:12px;}
+.mc-score-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.mc-score{font-size:26px;font-weight:800;letter-spacing:-1px;}
+.mc-bar-wrap{flex:1;}
+.mc-bar{height:6px;background:var(--border2);border-radius:99px;overflow:hidden;}
+.mc-fill{height:100%;border-radius:99px;transition:width .5s .1s;}
+.mc-max{font-size:10.5px;color:var(--text3);font-family:var(--mono);margin-top:4px;}
+.performance-ring{width:110px;height:110px;position:relative;flex-shrink:0;}
+.performance-ring svg{transform:rotate(-90deg);}
+.ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.ring-pct{font-size:20px;font-weight:800;}
+.ring-sub{font-size:9px;color:var(--text3);font-family:var(--mono);}
+</style>
+</head>
+<body>
+<div class="sidebar" id="sidebar-root"></div>
+<div class="main">
+  <div class="topbar">
+    <div><h1>My Marks</h1><div class="tsub">Subject-wise exam performance</div></div>
+  </div>
+  <div class="page-body">
+    <!-- Overall stats -->
+    <div class="cards-grid cards-4 mb24">
+      <div class="stat-card blue"><div class="sc-icon">📊</div><div class="sc-label">Overall Marks</div><div class="sc-val" id="s-overall">—</div><div class="sc-sub">All subjects avg</div></div>
+      <div class="stat-card green"><div class="sc-icon">🏆</div><div class="sc-label">Grade</div><div class="sc-val" id="s-grade">—</div><div class="sc-sub">Current grade</div></div>
+      <div class="stat-card purple"><div class="sc-icon">📚</div><div class="sc-label">Subjects</div><div class="sc-val" id="s-count">—</div><div class="sc-sub">Total subjects</div></div>
+      <div class="stat-card amber"><div class="sc-icon">🎯</div><div class="sc-label">Best Subject</div><div class="sc-val" id="s-best" style="font-size:14px;margin-top:4px;">—</div></div>
+    </div>
+
+    <!-- Visual overview + table -->
+    <div class="cards-grid cards-2 mb24">
+      <div class="panel">
+        <div class="panel-head"><span class="ph-title">Performance Overview</span></div>
+        <div style="padding:18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+          <div class="performance-ring">
+            <svg width="110" height="110" viewBox="0 0 110 110">
+              <circle cx="55" cy="55" r="46" fill="none" stroke="var(--border2)" stroke-width="8"/>
+              <circle cx="55" cy="55" r="46" fill="none" stroke="var(--blue)" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="289" id="ring-circle" stroke-dashoffset="289"/>
+            </svg>
+            <div class="ring-label">
+              <div class="ring-pct" id="ring-pct">0%</div>
+              <div class="ring-sub">overall</div>
+            </div>
+          </div>
+          <div style="flex:1;" id="subject-bars"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span class="ph-title">All Records</span><span class="ph-count" id="rec-count">0 records</span></div>
+        <div class="tbl-wrap" style="max-height:280px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>Subject</th><th>Exam</th><th>Score</th><th>%</th><th>Date</th></tr></thead>
+            <tbody id="marks-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Subject cards grid -->
+    <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px;text-transform:uppercase;letter-spacing:.8px;font-family:var(--mono);">Subject Breakdown</div>
+    <div class="cards-grid cards-3" id="marks-cards" style="gap:12px;"></div>
+  </div>
+</div>
+<script src="../js/shared.js"></script>
+<script>
+(function(){
+  const session = authGuard('student');
+  if(!session) return;
+  renderSidebar('my-marks');
+
+  async function load(){
+    const r=await GET(API.students+'/'+session.user.id);
+    if(!r.success) return;
+    const s=r.data;
+    const recs=s.marksRecords||[];
+
+    document.getElementById('s-overall').textContent=s.marks+'%';
+    document.getElementById('s-grade').textContent=s.grade||'N/A';
+    document.getElementById('s-count').textContent=recs.length;
+
+    // Ring animation
+    const circumference=289;
+    const offset=circumference-(s.marks/100)*circumference;
+    document.getElementById('ring-pct').textContent=s.marks+'%';
+    setTimeout(()=>{
+      document.getElementById('ring-circle').style.strokeDashoffset=offset;
+      document.getElementById('ring-circle').style.transition='stroke-dashoffset 1s ease';
+      // Color based on performance
+      const color=s.marks>=80?'var(--green)':s.marks>=60?'var(--blue)':'var(--amber)';
+      document.getElementById('ring-circle').setAttribute('stroke',color.replace('var(','').replace(')',''));
+      document.getElementById('ring-circle').style.stroke=color;
+    },100);
+
+    // Best subject
+    if(recs.length){
+      const best=recs.reduce((a,b)=>(b.score/b.maxScore>a.score/a.maxScore?b:a));
+      document.getElementById('s-best').textContent=best.subject;
+    }
+
+    // Subject bars
+    const bySubject={};
+    recs.forEach(r=>{
+      if(!bySubject[r.subject]) bySubject[r.subject]=[];
+      bySubject[r.subject].push(r.score/r.maxScore*100);
+    });
+    const subjects=Object.keys(bySubject);
+    document.getElementById('rec-count').textContent=recs.length+' records';
+
+    document.getElementById('subject-bars').innerHTML=subjects.slice(0,6).map(sub=>{
+      const avg=Math.round(bySubject[sub].reduce((a,b)=>a+b,0)/bySubject[sub].length);
+      const color=avg>=80?'var(--green)':avg>=60?'var(--blue)':'var(--amber)';
+      return `<div style="margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px;">
+          <span style="font-weight:600;">${sub}</span>
+          <span style="font-family:var(--mono);color:var(--text2);">${avg}%</span>
+        </div>
+        <div style="height:5px;background:var(--border2);border-radius:99px;overflow:hidden;">
+          <div style="height:100%;width:${avg}%;background:${color};border-radius:99px;"></div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Table
+    const tbody=document.getElementById('marks-table');
+    if(!recs.length){tbody.innerHTML=emptyState('No marks recorded yet');return;}
+    const sorted=[...recs].sort((a,b)=>b.date?.localeCompare(a.date||'')||0);
+    tbody.innerHTML=sorted.map(m=>{
+      const pct=Math.round(m.score/m.maxScore*100);
+      return `<tr>
+        <td class="td-name">${m.subject}</td>
+        <td style="font-size:12px;">${m.examType}</td>
+        <td class="td-mono">${m.score}/${m.maxScore}</td>
+        <td>${gradeBadge(pct>=80?'A':pct>=60?'B':'C')}</td>
+        <td class="td-mono">${m.date||'—'}</td>
+      </tr>`;
+    }).join('');
+
+    // Subject cards
+    document.getElementById('marks-cards').innerHTML=subjects.map(sub=>{
+      const subRecs=recs.filter(r=>r.subject===sub);
+      const avg=Math.round(subRecs.reduce((a,b)=>a+(b.score/b.maxScore*100),0)/subRecs.length);
+      const grade=avg>=80?'A':avg>=60?'B':'C';
+      const barColor=avg>=80?'var(--green)':avg>=60?'var(--blue)':'var(--amber)';
+      return `<div class="marks-card">
+        <div class="mc-subject">${sub}</div>
+        <div class="mc-exam">${subRecs.length} exam${subRecs.length!==1?'s':''} · Latest: ${subRecs[subRecs.length-1].examType}</div>
+        <div class="mc-score-row">
+          <div class="mc-score" style="color:${barColor};">${avg}%</div>
+          ${gradeBadge(grade)}
+        </div>
+        <div class="mc-bar-wrap">
+          <div class="mc-bar"><div class="mc-fill" style="width:${avg}%;background:${barColor};"></div></div>
+          <div class="mc-max">${subRecs.length} record${subRecs.length!==1?'s':''}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  load();
+})();
+</script>
+</body>
+</html>
